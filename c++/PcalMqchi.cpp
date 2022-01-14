@@ -73,6 +73,7 @@ int main()
   ofstream ofs(str);
 
   int done = 0;
+  cout << "\r" << setw(3) << 0 << "%" << flush;
   
 #ifdef _OPENMP
 #pragma omp parallel for
@@ -92,12 +93,16 @@ int main()
 	{
 	  ofs << calM << ' ' << q << ' ' << chi << ' '
 	      << PcalMqchi(calM,q,chi) << endl;
-
-	  done++;
-	  cout << "\r" << setw(3)
-	       << 100*done/(LNCALMSTEP+1)/(QSTEP+1)/(LNCHISTEP+1)
-	       << "%" << flush;
 	}
+      }
+
+#ifdef _OPENMP
+#pragma omp critical
+#endif
+      {
+	done++;
+	cout << "\r" << setw(3)
+	     << 100*done/(LNCALMSTEP+1)/(QSTEP+1) << "%" << flush;
       }
     }
   }
