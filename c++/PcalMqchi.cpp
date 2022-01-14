@@ -24,7 +24,7 @@ using namespace std;
 
 #define CALMMIN 1e-3
 #define CALMMAX 10
-#define LNCALMSTEP 9 //920
+//#define LNCALMSTEP 9 //920
 
 #define CHIMIN 1e-7
 #define CHIMAX 1e-2
@@ -50,8 +50,21 @@ double M1incalMq(double calM, double q);
 double M2incalMq(double calM, double q);
 
 
-int main()
+int main(int argc, char *argv[])
 {
+  if (argc != 3) {
+    cout << "iM, lncalMstep を正しく指定してください" << endl;
+    return 1;
+  }
+
+  int iM = atoi(argv[1]);
+  int lncalMstep = atoi(argv[2]);
+
+  if (iM < 0 || iM > lncalMstep) {
+    cout << "iM, lncalMstep を正しく指定してください" << endl;
+    return 1;
+  }
+  
   // ---------------- start stop watch -----------------
   struct timeval tv;
   struct timezone tz;
@@ -61,33 +74,34 @@ int main()
   before = (double)tv.tv_sec + (double)tv.tv_usec * 1.e-6;
   // ---------------------------------------------------
 
-  double dlncalM = (log(CALMMAX)-log(CALMMIN))/LNCALMSTEP;
+  double dlncalM = (log(CALMMAX)-log(CALMMIN))/lncalMstep;
   double dlnchi = (log(CHIMAX)-log(CHIMIN))/LNCHISTEP;
   double dq = (QMAX-QMIN)/QSTEP;
+
+  double calM = CALMMIN*exp(iM*dlncalM);
+
+  cout << "calM = " << calM << endl;
 
 #ifdef _OPENMP
   cout << "OpenMP : Enabled (Max # of threads = " << omp_get_max_threads() << ")" << endl;
 #endif
 
-  double data[LNCALMSTEP+1][QSTEP+1][LNCHISTEP+1];
+  //double data[LNCALMSTEP+1][QSTEP+1][LNCHISTEP+1];
+  double data[QSTEP+1][LNCHISTEP+1];
   
   int done = 0;
-  cout << "\r" << setw(3) << 100*done/(LNCALMSTEP+1) << "%" << flush;
+  cout << "\r" << setw(3) << 100*done/(QSTEP+1) << "%" << flush;
   
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
-  for (int iM=0; iM<=LNCALMSTEP; iM++) {
-    double calM = CALMMIN*exp(iM*dlncalM);
-
-    for (int iq=0; iq<=QSTEP; iq++) {
-      double q = QMIN+iq*dq;
+  for (int iq=0; iq<=QSTEP; iq++) {
+    double q = QMIN+iq*dq;
+    
+    for (int ic=0; ic<=LNCHISTEP; ic++) {
+      double chi = CHIMIN*exp(ic*dlnchi);
       
-      for (int ic=0; ic<=LNCHISTEP; ic++) {
-	double chi = CHIMIN*exp(ic*dlnchi);
-
-	data[iM][iq][ic] = PcalMqchi(calM,q,chi);
-      }
+      data[iq][ic] = PcalMqchi(calM,q,chi);
     }
     
 #ifdef _OPENMP
@@ -95,26 +109,22 @@ int main()
 #endif
     {
       done++;
-      cout << "\r" << setw(3) << 100*done/(LNCALMSTEP+1) << "%" << flush;
+      cout << "\r" << setw(3) << 100*done/(QSTEP+1) << "%" << flush;
     }
   }
-
+  
   cout << endl;
-
+  
   string str = "PcalMqchi.dat";
-  ofstream ofs(str);
+  ofstream ofs(str,std::ios::app);
 
-  for (int iM=0; iM<=LNCALMSTEP; iM++) {
-    double calM = CALMMIN*exp(iM*dlncalM);
-
-    for (int iq=0; iq<=QSTEP; iq++) {
-      double q = QMIN+iq*dq;
+  for (int iq=0; iq<=QSTEP; iq++) {
+    double q = QMIN+iq*dq;
+    
+    for (int ic=0; ic<=LNCHISTEP; ic++) {
+      double chi = CHIMIN*exp(ic*dlnchi);
       
-      for (int ic=0; ic<=LNCHISTEP; ic++) {
-	double chi = CHIMIN*exp(ic*dlnchi);
-
-	ofs << calM << ' ' << q << ' ' << chi << ' ' << data[iM][iq][ic] << endl;
-      }
+      ofs << calM << ' ' << q << ' ' << chi << ' ' << data[iq][ic] << endl;
     }
   }
 
