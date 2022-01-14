@@ -18,6 +18,25 @@ using namespace std;
 #define GAMMA 0.85
 #define NA 0.9999088
 
+#define AMIN 1e-10
+#define AMAX 1
+#define LNASTEP 2300
+
+#define CALMMIN 1e-3
+#define CALMMAX 10
+#define LNCALMSTEP 9 //920
+
+#define CHIMIN 1e-7
+#define CHIMAX 1e-2
+#define LNCHISTEP 12 //1150
+
+#define QMIN 0.01
+#define QMAX 1
+#define QSTEP 10 //99
+
+
+double PcalMqchi(double calM, double q, double chi);
+double PcalMqchiint(double a1, double a2, double M1, double M2, double nu1, double nu2, double q, double chi);
 double Ph(double h);
 double Cnu(double M, double nu);
 double Na(double M, double nu);
@@ -27,6 +46,8 @@ double LL(double a1, double a2, double chi, double q);
   
 double Minnu(double nu);
 double nuinM(double M);
+double M1incalMq(double calM, double q);
+double M2incalMq(double calM, double q);
 
 
 int main()
@@ -40,13 +61,49 @@ int main()
   before = (double)tv.tv_sec + (double)tv.tv_usec * 1.e-6;
   // ---------------------------------------------------
 
-  double nu = NUTH + 1e-2;
+  double dlncalM = (log(CALMMAX)-log(CALMMIN))/LNCALMSTEP;
+  double dlnchi = (log(CHIMAX)-log(CHIMIN))/LNCHISTEP;
+  double dq = (QMAX-QMIN)/QSTEP;
 
-  cout << Panu(1e-10,Minnu(nu),nu) << ' '
-       << Panu(1e-8,Minnu(nu),nu) << ' '
-       << Panu(1e-6,Minnu(nu),nu) << ' '
-       << Panu(1e-4,Minnu(nu),nu) << ' '
-       << Panu(1e-2,Minnu(nu),nu) << endl;
+#ifdef _OPENMP
+  cout << "OpenMP : Enabled (Max # of threads = " << omp_get_max_threads() << ")" << endl;
+#endif
+
+  string str = "PcalMqchi.dat";
+  ofstream ofs(str);
+
+  int done = 0;
+  
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+  for (int iM=0; iM<=LNCALMSTEP; iM++) {
+    double calM = CALMMIN*exp(iM*dlncalM);
+
+    for (int iq=0; iq<=QSTEP; iq++) {
+      double q = QMIN+iq*dq;
+      
+      for (int ic=0; ic<=LNCHISTEP; ic++) {
+	double chi = CHIMIN*exp(ic*dlnchi);
+
+#ifdef _OPENMP
+#pragma omp critical
+#endif
+	{
+	  ofs << calM << ' ' << q << ' ' << chi << ' '
+	      << PcalMqchi(calM,q,chi) << endl;
+
+	  done++;
+	  cout << "\r" << setw(3)
+	       << 100*done/(LNCALMSTEP+1)/(QSTEP+1)/(LNCHISTEP+1)
+	       << "%" << flush;
+	}
+      }
+    }
+  }
+
+  cout << endl;
+    
 
   // ---------------- return elapsed time --------------
   gettimeofday(&tv, &tz);
@@ -55,8 +112,42 @@ int main()
   // ---------------------------------------------------
 }
 
-double PlncalMqchi(double calM, double q, double chi) {
-  
+
+double PcalMqchi(double calM, double q, double chi) {
+  double PcalMqchi = 0;
+  double dlna = (log(AMAX)-log(AMIN))/LNASTEP;
+
+  double M1 = M1incalMq(calM,q);
+  double M2 = M2incalMq(calM,q);
+  double nu1 = nuinM(M1);
+  double nu2 = nuinM(M2);
+    
+  double a1, a2;
+
+  for (int i1 = 0; i1 <= LNASTEP; i1++) {
+    a1 = AMIN*exp(dlna*i1);
+      
+    for (int i2 = 0; i2 <= LNASTEP; i2++) {
+      a2 = AMIN*exp(dlna*i2);
+      
+      if (i1 == 0 || i1 == LNASTEP || i2 == 0 || i2 == LNASTEP) {
+	PcalMqchi += PcalMqchiint(a1,a2,M1,M2,nu1,nu2,q,chi)/2*dlna*dlna;
+      } else {
+	PcalMqchi += PcalMqchiint(a1,a2,M1,M2,nu1,nu2,q,chi)*dlna*dlna;
+      }
+    }
+  }
+
+  double coeff = (1+q)/4/q/q/BETA/BETA/SIGMA0/SIGMA0*pow(pow(1+q,2./5)*calM*calM/pow(q,1./5)/KK/KK,1./BETA);
+  return chi*coeff*PcalMqchi;
+}
+
+double PcalMqchiint(double a1, double a2, double M1, double M2, double nu1, double nu2, double q, double chi) {
+  if (LL(a1,a2,chi,q) > 0) {
+    return LL(a1,a2,chi,q)*Panu(a1,M1,nu1)*Pnu(nu1)*Panu(a2,M2,nu2)*Pnu(nu2);
+  } else {
+    return 0;
+  }
 }
 
 
@@ -90,5 +181,13 @@ double Minnu(double nu) {
 }
 
 double nuinM(double M) {
-  return pow(M,1./BETA)/SIGMA0 + NUTH;
+  return pow(M/KK,1./BETA)/SIGMA0 + NUTH;
+}
+
+double M1incalMq(double calM, double q) {
+  return pow(q,-3./5)*pow(1+q,1./5)*calM;
+}
+
+double M2incalMq(double calM, double q) {
+  return pow(q,2./5)*pow(1+q,1./5)*calM;
 }
