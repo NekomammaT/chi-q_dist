@@ -18,9 +18,9 @@ using namespace std;
 #define GAMMA 0.85
 #define NA 0.9999088
 
-#define AMIN 1e-10
+#define AMIN 1e-8
 #define AMAX 1
-#define LNASTEP 2300
+#define LNASTEP 1840
 
 #define CALMMIN 1e-3
 #define CALMMAX 10
@@ -69,11 +69,10 @@ int main()
   cout << "OpenMP : Enabled (Max # of threads = " << omp_get_max_threads() << ")" << endl;
 #endif
 
-  string str = "PcalMqchi.dat";
-  ofstream ofs(str);
-
+  double data[LNCALMSTEP+1][QSTEP+1][LNCHISTEP+1];
+  
   int done = 0;
-  cout << "\r" << setw(3) << 0 << "%" << flush;
+  cout << "\r" << setw(3) << 100*done/(LNCALMSTEP+1) << "%" << flush;
   
 #ifdef _OPENMP
 #pragma omp parallel for
@@ -87,27 +86,38 @@ int main()
       for (int ic=0; ic<=LNCHISTEP; ic++) {
 	double chi = CHIMIN*exp(ic*dlnchi);
 
+	data[iM][iq][ic] = PcalMqchi(calM,q,chi);
+      }
+    }
+    
 #ifdef _OPENMP
 #pragma omp critical
 #endif
-	{
-	  ofs << calM << ' ' << q << ' ' << chi << ' '
-	      << PcalMqchi(calM,q,chi) << endl;
-	}
-      }
-
-#ifdef _OPENMP
-#pragma omp critical
-#endif
-      {
-	done++;
-	cout << "\r" << setw(3)
-	     << 100*done/(LNCALMSTEP+1)/(QSTEP+1) << "%" << flush;
-      }
+    {
+      done++;
+      cout << "\r" << setw(3) << 100*done/(LNCALMSTEP+1) << "%" << flush;
     }
   }
 
   cout << endl;
+
+  string str = "PcalMqchi.dat";
+  ofstream ofs(str);
+
+  for (int iM=0; iM<=LNCALMSTEP; iM++) {
+    double calM = CALMMIN*exp(iM*dlncalM);
+
+    for (int iq=0; iq<=QSTEP; iq++) {
+      double q = QMIN+iq*dq;
+      
+      for (int ic=0; ic<=LNCHISTEP; ic++) {
+	double chi = CHIMIN*exp(ic*dlnchi);
+
+	ofs << calM << ' ' << q << ' ' << chi << ' ' << data[iM][iq][ic] << endl;
+      }
+    }
+  }
+
     
 
   // ---------------- return elapsed time --------------
@@ -134,11 +144,13 @@ double PcalMqchi(double calM, double q, double chi) {
       
     for (int i2 = 0; i2 <= LNASTEP; i2++) {
       a2 = AMIN*exp(dlna*i2);
-      
-      if (i1 == 0 || i1 == LNASTEP || i2 == 0 || i2 == LNASTEP) {
-	PcalMqchi += PcalMqchiint(a1,a2,M1,M2,nu1,nu2,q,chi)/2*dlna*dlna;
-      } else {
-	PcalMqchi += PcalMqchiint(a1,a2,M1,M2,nu1,nu2,q,chi)*dlna*dlna;
+
+      if (LL(a1,a2,chi,q) > 0) {
+	if (i1 == 0 || i1 == LNASTEP || i2 == 0 || i2 == LNASTEP) {
+	  PcalMqchi += PcalMqchiint(a1,a2,M1,M2,nu1,nu2,q,chi)/2*dlna*dlna;
+	} else {
+	  PcalMqchi += PcalMqchiint(a1,a2,M1,M2,nu1,nu2,q,chi)*dlna*dlna;
+	}
       }
     }
   }
@@ -148,11 +160,7 @@ double PcalMqchi(double calM, double q, double chi) {
 }
 
 double PcalMqchiint(double a1, double a2, double M1, double M2, double nu1, double nu2, double q, double chi) {
-  if (LL(a1,a2,chi,q) > 0) {
-    return LL(a1,a2,chi,q)*Panu(a1,M1,nu1)*Pnu(nu1)*Panu(a2,M2,nu2)*Pnu(nu2);
-  } else {
-    return 0;
-  }
+  return LL(a1,a2,chi,q)*Panu(a1,M1,nu1)*Pnu(nu1)*Panu(a2,M2,nu2)*Pnu(nu2);
 }
 
 
