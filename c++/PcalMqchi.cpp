@@ -28,11 +28,11 @@ using namespace std;
 
 #define CHIMIN 1e-7
 #define CHIMAX 1e-2
-#define LNCHISTEP 12 //1150
+#define LNCHISTEP 115 //1150
 
 #define QMIN 0.01
 #define QMAX 1
-#define QSTEP 10 //99
+#define QSTEP 99
 
 
 double PcalMqchi(double calM, double q, double chi);
