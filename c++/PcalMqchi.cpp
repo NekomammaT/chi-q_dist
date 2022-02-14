@@ -90,31 +90,36 @@ int main(int argc, char *argv[])
   double data[QSTEP+1][LNCHISTEP+1];
   
   int done = 0;
-  cout << "\r" << setw(3) << 100*done/(QSTEP+1) << "%" << flush;
+  //cout << "\r" << setw(3) << 100*done/(QSTEP+1) << "%" << flush;
   
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
-  for (int iq=0; iq<=QSTEP; iq++) {
-    double q = QMIN+iq*dq;
+  //for (int iq=0; iq<=QSTEP; iq++) {
+  int iq = 50;
+  double q = QMIN+iq*dq;
     
-    for (int ic=0; ic<=LNCHISTEP; ic++) {
-      double chi = CHIMIN*exp(ic*dlnchi);
+  //for (int ic=0; ic<=LNCHISTEP; ic++) {
+  int ic = 50;
+  double chi = CHIMIN*exp(ic*dlnchi);
       
-      data[iq][ic] = PcalMqchi(calM,q,chi);
-    }
+  data[iq][ic] = PcalMqchi(calM,q,chi);
+  //}
     
 #ifdef _OPENMP
 #pragma omp critical
 #endif
-    {
-      done++;
-      cout << "\r" << setw(3) << 100*done/(QSTEP+1) << "%" << flush;
-    }
-  }
+  //{
+  //done++;
+  //cout << "\r" << setw(3) << 100*done/(QSTEP+1) << "%" << flush;
+  //}
+  //}
   
-  cout << endl;
+  //cout << endl;
+
+  cout << calM << ' ' << q << ' ' << chi << ' ' << data[iq][ic] << endl;
   
+  /*
   string str = "PcalMqchi.dat";
   ofstream ofs(str,std::ios::app);
 
@@ -127,6 +132,7 @@ int main(int argc, char *argv[])
       ofs << calM << ' ' << q << ' ' << chi << ' ' << data[iq][ic] << endl;
     }
   }
+  */
 
     
 
@@ -156,7 +162,9 @@ double PcalMqchi(double calM, double q, double chi) {
       a2 = AMIN*exp(dlna*i2);
 
       if (LL(a1,a2,chi,q) > 0) {
-	if (i1 == 0 || i1 == LNASTEP || i2 == 0 || i2 == LNASTEP) {
+	if ((i1 == 0 || i1 == LNASTEP) && (i2 == 0 || i2 == LNASTEP)) {
+	  PcalMqchi += PcalMqchiint(a1,a2,M1,M2,nu1,nu2,q,chi)/4.*dlna*dlna;
+	} else if (i1 == 0 || i1 == LNASTEP || i2 == 0 || i2 == LNASTEP) {
 	  PcalMqchi += PcalMqchiint(a1,a2,M1,M2,nu1,nu2,q,chi)/2*dlna*dlna;
 	} else {
 	  PcalMqchi += PcalMqchiint(a1,a2,M1,M2,nu1,nu2,q,chi)*dlna*dlna;
